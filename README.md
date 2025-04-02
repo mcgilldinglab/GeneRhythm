@@ -47,6 +47,6 @@ Please check the tutorial directory of the repository.
 
 * [Tutorial for scGeneRhythm gene clustering and analyzing on single-cell RNA-seq data](https://github.com/mcgilldinglab/scGeneRhythm/blob/main/tutorial/scRNA-seq_mouse_embryo_blood.ipynb)
 
-* [Tutorial for scGeneRhythm gene clustering and differential frequency biomarker finding on single-cell ATAC-seq data](https://github.com/mcgilldinglab/scGeneRhythm/blob/main/tutorial/scATAC-seq_mouse_atherosclerotic_plaque_immune cells.ipynb)
+* [Tutorial for scGeneRhythm gene clustering and differential frequency biomarker finding on single-cell ATAC-seq data](https://github.com/mcgilldinglab/scGeneRhythm/blob/main/tutorial/scATAC-seq_mouse_atherosclerotic_plaque_immune_cells.ipynb)
 
 * [Tutorial for scGeneRhythm gene clustering and differential frequency biomarker finding on Spatial data](https://github.com/mcgilldinglab/scGeneRhythm/blob/main/tutorial/Spatial_LIBD_human_dorsolateral_prefrontal_cortex.ipynb)
