@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 import argparse
 
@@ -63,9 +62,6 @@ class GCN_VAE(torch.nn.Module):
     def __init__(self, latent_size = 20):
         super().__init__()
         self.latent_size = latent_size
-        # self.conv1 = GCNConv(100, 100)
-        # self.conv2 = GCNConv(50, 50)
-        # self.conv3 = GCNConv(100, 100)
         self.encoder_forward1 = nn.Sequential(
             nn.Linear(100 ,70),
             nn.LeakyReLU(),
@@ -133,28 +129,21 @@ class GCN_VAE(torch.nn.Module):
         return z
 
     def loss(self, X, mu_prime, mu, log_var):
-        # reconstruction_loss = F.mse_loss(mu_prime, X, reduction='mean') is wrong!
         reconstruction_loss = torch.mean(torch.square(X - mu_prime).sum(dim=1))
 
         latent_loss = torch.mean(0.5 * (log_var.exp() + torch.square(mu) - log_var).sum(dim=1))
 
         loss = reconstruction_loss + 0.05 * latent_loss
 
-        # loss = reconstruction_loss
-
         return reconstruction_loss
 
 
     def forward(self, data):
-        # x, edge_index = data.x, data.edge_index
         x = data.x
         print(x.shape)
         x1 = x[:, :100]
         x2 = x[:, 100:150]
         x3 = x[:, 150:]
-        # x1 = self.conv1(x1, edge_index)
-        # x2 = self.conv2(x2, edge_index)
-        # x3 = self.conv3(x3, edge_index)
         mu1, log_var1 = self.encoder(x1, self.encoder_forward1, 10)
         mu2, log_var2 = self.encoder(x2, self.encoder_forward2, 10)
         mu3, log_var3 = self.encoder(x3, self.encoder_forward3, 10)
@@ -177,9 +166,6 @@ class GCN_VAE_Graph(torch.nn.Module):
     def __init__(self, latent_size = 20):
         super().__init__()
         self.latent_size = latent_size
-        # self.conv1 = GCNConv(100, 100)
-        # self.conv2 = GCNConv(50, 50)
-        # self.conv3 = GCNConv(100, 100)
         self.encoder_forward1 = nn.Sequential(
             nn.Linear(100 ,70),
             nn.LeakyReLU(),
@@ -247,14 +233,12 @@ class GCN_VAE_Graph(torch.nn.Module):
         return z
 
     def loss(self, X, mu_prime, mu, log_var):
-        # reconstruction_loss = F.mse_loss(mu_prime, X, reduction='mean') is wrong!
+
         reconstruction_loss = torch.mean(torch.square(X - mu_prime).sum(dim=1))
 
         latent_loss = torch.mean(0.5 * (log_var.exp() + torch.square(mu) - log_var).sum(dim=1))
 
         loss = reconstruction_loss + 0.05 * latent_loss
-
-        # loss = reconstruction_loss
 
         return reconstruction_loss
 
@@ -292,7 +276,6 @@ def train(model, optimizer, data_loader, device, name='GCN_VAE'):
 
     total_loss = 0
     for X in data_loader:
-        # batch_size = X.shape[0]
         X = X.to(device)
         model.zero_grad()
         r1, r2, r3, z = model(X)
@@ -307,6 +290,21 @@ def train(model, optimizer, data_loader, device, name='GCN_VAE'):
         total_loss += loss.item()
 
     return total_loss
+
+
+
+
+def benchmark(adata):
+    sc.pp.neighbors(adata, n_neighbors=10, n_pcs=10)
+    sc.tl.umap(adata)
+
+    sc.tl.leiden(adata)
+    sc.pl.umap(adata, color=['leiden'], legend_loc='on data', legend_fontsize='x-large', save='ALL.pdf')
+    CHscore = calinski_harabaz_score(adata.X, adata.obs['leiden'])
+    Silscore = silhouette_score(adata.X, adata.obs['leiden'])
+    DBscore = davies_bouldin_score(adata.X, adata.obs['leiden'])
+    Dunnscore = dunn_index(adata.X, adata.obs['leiden'])
+    print("ALL: CH: " + str(CHscore) + " Silhoutte: " + str(Silscore) + " DB: " + str(DBscore) + " Dunn: " + str(Dunnscore))
 
 
 def scGeneRhythm_Model(input_data,graph=None, model_output='ALL_mu.npy', latent_output='gcn_vae.pth', sc_data, lr=0.00005, n_epoch=1000, batch_size=32):
@@ -365,33 +363,10 @@ def scGeneRhythm_Model(input_data,graph=None, model_output='ALL_mu.npy', latent_
         _, _,_, z = gcn_vae(data)
 
     z = z.cpu().detach().numpy()
-    print(z.shape)
     np.save(latent_output, z)
-    adata2 = sc_data
-    sc.pp.normalize_total(adata2)
-    sc.pp.log1p(adata2)
-    sc.pp.highly_variable_genes(adata2, flavor="seurat", n_top_genes=5000)
 
-    adata = sc_data
-    adata = adata[:, adata2.var.highly_variable]
-    gene_info = adata
-    # non_zero_index = np.load('non_zero_index1.npy')
-    data = np.load(latent_output)
-    adata = ad.AnnData(data)
-    adata.obs_names = gene_info.obs_names
-    adata.var_names = ["C" + str(i) for i in range(20)]
-    adata.obs['indexa'] = range(len(adata.obs_names))
 
-    sc.pp.neighbors(adata, n_neighbors=10, n_pcs=10)
-    sc.tl.umap(adata)
 
-    sc.tl.leiden(adata)
-    sc.pl.umap(adata, color=['leiden'], legend_loc='on data', legend_fontsize='x-large', save='ALL.pdf')
-    CHscore = calinski_harabaz_score(adata.X, adata.obs['leiden'])
-    Silscore = silhouette_score(adata.X, adata.obs['leiden'])
-    DBscore = davies_bouldin_score(adata.X, adata.obs['leiden'])
-    Dunnscore = dunn_index(adata.X, adata.obs['leiden'])
-    print("ALL: CH: "+str(CHscore)+" Silhoutte: "+str(Silscore)+" DB: "+str(DBscore)+" Dunn: "+str(Dunnscore))
 
 
 
