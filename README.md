@@ -1,7 +1,7 @@
-# scGeneRhythm
+# GeneRhythm
 ## Overview
 <img title="Model Overview" alt="Alt text" src="/figures/main.png">
-Gene clustering and bio-marker finding in single-cell RNA sequencing play a pivotal role in unraveling a plethora of biological processes, from cell differentiation to disease progression and metabolic pathways. Traditional time-domain methods are instrumental in certain analyses, yet they may overlook intricate relationships. For instance, genes that appear distinct in the time domain might exhibit striking similarities in the frequency domain. Recognizing this, we present scGeneRhythm, an innovative deep learning technique that employs wavelets transformation. This approach captures the rich tapestry of gene expression from both the time and frequency domains. Through integrating frequency-domain data, scGeneRhythm not only refines gene grouping but also uncovers pivotal biological insights, such as nuanced gene rhythmicity. By deploying scGeneRhythm, we foster a richer, multi-dimensional understanding of gene expression dynamics, enriching the potential avenues of cellular and molecular biology research.
+Gene expression dynamics are central to biological processes such as cell differentiation, disease progression, and tissue remodeling. Most analyses focus on changes in the time domain, overlooking frequency associated patterns that may reveal distinct regulatory mechanisms. We introduce GeneRhythm, a deep learning framework that defines and extracts gene rhythm, a novel feature that quantifies the frequency of gene expression changes via wavelet transformation. By modeling gene expression in time and frequency domains, GeneRhythm captures transcriptional programs missed by conventional methods. We show that gene rhythm improves gene clustering by grouping rhythmically similar genes into functionally coherent modules. It also identifies rhythm differential genes, which have similar expression levels but distinct rhythmic patterns that reveal complementary biological insights. Applied to spatial transcriptomics, GeneRhythm reveals spatially organized rhythmic patterns reflecting tissue structure. GeneRhythm provides a generalizable and frequency aware framework for uncovering dynamic regulatory programs in single cell and spatial omics data.
 
 ## Key Capabilities
 
@@ -34,19 +34,19 @@ Gene clustering and bio-marker finding in single-cell RNA sequencing play a pivo
     * monocle3 >= 1.3.1
 
 
-You may install scCross by the following command:
+You may install GeneRhythm by the following command:
 
 ```
-git clone https://github.com/mcgilldinglab/scGeneRhythm.git
-cd scGeneRhythm
+git clone https://github.com/mcgilldinglab/GeneRhythm.git
+cd GeneRhythm
 pip3 install -r requirements.txt 
 ```
 ## Tutorials
 
 Please check the tutorial directory of the repository.
 
-* [Tutorial for scGeneRhythm gene clustering and analyzing on single-cell RNA-seq data](https://github.com/mcgilldinglab/scGeneRhythm/blob/main/tutorial/scRNA-seq_mouse_embryo_blood.ipynb)
+* [Tutorial for GeneRhythm gene clustering and analyzing on single-cell RNA-seq data](https://github.com/mcgilldinglab/GeneRhythm/blob/main/tutorial/scRNA-seq_mouse_embryo_blood.ipynb)
 
-* [Tutorial for scGeneRhythm gene clustering and differential frequency biomarker finding on single-cell ATAC-seq data](https://github.com/mcgilldinglab/scGeneRhythm/blob/main/tutorial/scATAC-seq_mouse_atherosclerotic_plaque_immune_cells.ipynb)
+* [Tutorial for GeneRhythm gene clustering and differential frequency biomarker finding on single-cell ATAC-seq data](https://github.com/mcgilldinglab/GeneRhythm/blob/main/tutorial/scATAC-seq_mouse_atherosclerotic_plaque_immune_cells.ipynb)
 
-* [Tutorial for scGeneRhythm gene clustering and differential frequency biomarker finding on Spatial data](https://github.com/mcgilldinglab/scGeneRhythm/blob/main/tutorial/Spatial_LIBD_human_dorsolateral_prefrontal_cortex.ipynb)
+* [Tutorial for GeneRhythm gene clustering and differential frequency biomarker finding on Spatial data](https://github.com/mcgilldinglab/GeneRhythm/blob/main/tutorial/Spatial_LIBD_human_dorsolateral_prefrontal_cortex.ipynb)

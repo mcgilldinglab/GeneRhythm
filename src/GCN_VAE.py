@@ -307,7 +307,7 @@ def benchmark(adata):
     print("ALL: CH: " + str(CHscore) + " Silhoutte: " + str(Silscore) + " DB: " + str(DBscore) + " Dunn: " + str(Dunnscore))
 
 
-def scGeneRhythm_Model(input_data,graph=None, model_output='ALL_mu.npy', latent_output='gcn_vae.pth', sc_data, lr=0.00005, n_epoch=1000, batch_size=32):
+def GeneRhythm_Model(input_data,graph=None, model_output='ALL_mu.npy', latent_output='gcn_vae.pth', sc_data, lr=0.00005, n_epoch=1000, batch_size=32):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     device = torch.device(device)
 
