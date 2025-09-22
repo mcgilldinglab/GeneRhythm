@@ -81,23 +81,27 @@ def show_result(gene_info,trajectory_info,latent='ALL_mu.npy'):
     x.sort()
     x_smooth = np.linspace(start=x.min(), stop=x.max(), num=100)
     y_smooth = make_interp_spline(x, y.transpose())(x_smooth)
-    yf_smooth = fft(y_smooth.transpose())
     # Perform wavelet transform
-    wavelet = 'db4'
-    coeffs = pywt.wavedec(y_smooth.transpose(), wavelet)
+    wavelet = 'mexh'
+    scales = np.arange(1, 51)  # Define the range of scales
+    dt = x_smooth[1] - x_smooth[0]
+
+    coeffs, freqs = pywt.cwt(y_smooth.transpose(), scales, wavelet, sampling_period=dt)
 
     # Thresholding
     threshold = 0.01  # Set your threshold value here
-    coeffs_thresh = [pywt.threshold(c, threshold, mode='soft') for c in coeffs]
+    coeffs_thresh = pywt.threshold(coeffs, threshold, mode='soft')
 
-    # Reconstructing the signal
-    yf_smooth = pywt.waverec(coeffs_thresh, wavelet)
-    yf_info = np.array([abs(yf_smooth[i, :50]) for i in range(yf_smooth.shape[0])])
+
+    yf_smooth = np.sum(coeffs_thresh, axis=2).T
+    yf_info = np.array([abs(yf_smooth[i, :]) for i in range(yf_smooth.shape[0])])
 
     for i in range(len(yf_info)):
         if yf_info[i].max() == 0:
             continue
         yf_info[i] = yf_info[i] / yf_info[i].max()
+
+    y_k = y_smooth.transpose()
 
     for i in range(len(y)):
         y[i, :] = y[i, :] - y[i, 0]
@@ -115,67 +119,57 @@ def show_result(gene_info,trajectory_info,latent='ALL_mu.npy'):
 
     for j in range(200):
         cluster_num = str(j)
-        cluster = adata.obs[adata.obs['leiden'] == cluster_num]['indexa']
+        cluster = adata.obs.loc[adata.obs['leiden'] == cluster_num, 'indexa'].to_numpy()
 
-        error_t = []
-        for i in range(len(cluster)):
-            error_t.append(np.max(y[cluster[i], :] - np.min(y[cluster[i], :])))
-
+        error_t = np.max(y[cluster, :], axis=1) - np.min(y[cluster, :], axis=1)
         error_index_t = np.argsort(error_t)
-        error_t = np.array(error_t)
-        num = 0
-        cluster_filter = []
-        yf_info_filter = []
-        cluater_index = []
-        name = []
-        for i in error_index_t[:]:
-            a = movingaverage(y[cluster[i], :], 5)
-            if abs(np.max(abs(a))) < 0.01 or abs(np.max(abs(a))) > 5:
-                continue
-            num = num + 1
-            cluster_filter.append(a)
-            cluater_index.append(cluster[i])
-            yf_info_filter.append(yf_info[cluster[i], :])
-            name.append(adata.obs_names[cluster[i]])
-        cluster_filter = np.array(cluster_filter)
-        cluater_index = np.array(cluater_index)
-        yf_info_filter = np.array(yf_info_filter)
 
+        cluster_filter, y_info_filter, yf_info_filter = [], [], []
+        cluater_index, name = [], []
+        for idx in error_index_t:
+            a = movingaverage(y[cluster[idx], :], 5)
+            if abs(np.max(np.abs(a))) < 0.01 or abs(np.max(np.abs(a))) > 5:
+                continue
+            cluster_filter.append(a)
+            y_info_filter.append(y_k[cluster[idx], :])
+            yf_info_filter.append(yf_info[cluster[idx], :])
+            cluater_index.append(cluster[idx])
+            name.append(adata.obs_names[cluster[idx]])
+
+        cluster_filter = np.asarray(cluster_filter)
+        y_info_filter = np.asarray(y_info_filter)
+        yf_info_filter = np.asarray(yf_info_filter)
+        cluater_index = np.asarray(cluater_index)
 
         color_map = ['b', 'r', 'y', 'c', 'g']
         n_cluster = 5
-        index = [[] for i in range(n_cluster)]
-        namei = [[] for i in range(n_cluster)]
+        index = [[] for _ in range(n_cluster)]
+        namei = [[] for _ in range(n_cluster)]
 
         if len(cluster_filter) >= 5:
             y_pred = KMeans(n_clusters=n_cluster, random_state=9).fit_predict(cluster_filter)
-            color = []
-            number_of_genes = np.zeros([n_cluster])
-            for i in range(len(y_pred)):
-                index[y_pred[i]].append(i)
-                namei[y_pred[i]].append(name[i])
-            for i in y_pred:
-                number_of_genes[i] = number_of_genes[i] + 1
-                color.append(color_map[i])
-            for i in range(len(cluster_filter)):
-                if number_of_genes[y_pred[i]] < 5:
-                    continue
+            number_of_genes = np.zeros(n_cluster, dtype=int)
+            for i, lab in enumerate(y_pred):
+                index[lab].append(i)
+                namei[lab].append(name[i])
+                number_of_genes[lab] += 1
 
-            cluster_num = cluster_num
-
-            avg = np.zeros([n_cluster, cluster_filter.shape[1]])
-            std = np.zeros([n_cluster, cluster_filter.shape[1]])
-            yf_avg = np.zeros([n_cluster, yf_info_filter.shape[1]])
+            avg = np.zeros((n_cluster, cluster_filter.shape[1]))
+            std = np.zeros_like(avg)
+            yf_avg = np.zeros((n_cluster, yf_info_filter.shape[1]))
             for i in range(n_cluster):
+                if len(index[i]) == 0:
+                    continue
                 avg[i] = np.mean(cluster_filter[index[i]], axis=0)
                 std[i] = np.std(cluster_filter[index[i]], axis=0)
                 yf_avg[i] = np.mean(yf_info_filter[index[i]], axis=0)
+
             m = 0
             for i in range(n_cluster):
                 if number_of_genes[i] < 5:
                     continue
-                plt.errorbar(x[:-4], avg[i], yerr=std[i], c=color_map[i], label = 'path'+ str(m))
-                m = m+1
+                plt.errorbar(x[:-4], avg[i], yerr=std[i], c=color_map[i], label='path' + str(m))
+                m += 1
             plt.xlabel("Pseudotime", fontdict={'family': 'Arial', 'size': 18})
             plt.ylabel("Expression log2 fold change", fontdict={'family': 'Arial', 'size': 18})
             plt.title('cluster' + str(j), fontdict={'family': 'Arial', 'size': 18})
@@ -185,21 +179,15 @@ def show_result(gene_info,trajectory_info,latent='ALL_mu.npy'):
             if print_first[0] == 1:
                 plt.show()
                 print_first[0] = 0
-
             plt.close()
-            avgf_smooth = fft(avg.transpose())
-
-
-
 
 
             m = 0
             for i in range(n_cluster):
                 if number_of_genes[i] < 5:
                     continue
-                plt.plot(range(len(yf_avg[i])), yf_avg[i], c=color_map[i], label = 'path'+str(m))
-                m = m+1
-
+                plt.plot(range(len(yf_avg[i])), yf_avg[i][::-1], c=color_map[i], label='path' + str(m))
+                m += 1
             plt.xlabel("Frequency", fontdict={'family': 'Arial', 'size': 18})
             plt.ylabel("Amplitude", fontdict={'family': 'Arial', 'size': 18})
             plt.title('cluster' + str(j), fontdict={'family': 'Arial', 'size': 18})
@@ -212,30 +200,29 @@ def show_result(gene_info,trajectory_info,latent='ALL_mu.npy'):
             plt.close()
             plt.gcf().clear()
 
-            scales = np.arange(1, 128)
+
+            scales = np.arange(1, 51)
             m = 0
             for i in range(n_cluster):
                 if number_of_genes[i] < 5:
                     continue
 
-                plot_wavelet(x[:-4], yf_avg[i], scales, cluster_num, m, print_first[2])
+                plot_wavelet(x_smooth, y_info_filter[index[i]], scales, cluster_num, m, print_first[2])
                 print_first[2] = 0
+                m += 1
 
-                m = m + 1
-
+            mg = mygene.MyGeneInfo()
             m = 0
             for i in range(n_cluster):
-                if number_of_genes[i] < 5:
+                if number_of_genes[i] < 5 or len(namei[i]) == 0:
                     continue
-                plt.plot(range(cluster_filter.shape[1]), avg[i], c = color_map[i])
-                mg = mygene.MyGeneInfo()
                 gene_ids = mg.getgenes(namei[i], 'name, symbol, entrezgene', as_dataframe=True)
                 gene_ids.index.name = "UNIPROT"
                 gene_ids.reset_index(inplace=True)
-
                 gene_symbols = gene_ids['symbol']
-                gene_symbols.to_csv('Gene_' + cluster_num + '_path_' + str(m) + '.csv')
-                m = m+1
+                gene_symbols.to_csv(f'Gene_{cluster_num}_path_{m}.csv', index=False)
+                m += 1
+
 
 
 
@@ -253,18 +240,19 @@ def differential_frequency(dataset1,dataset2,dataset1_name,dataset2_name,feature
     x.sort()
     x_smooth = np.linspace(start=x.min(), stop=x.max(), num=100)
     y_smooth = make_interp_spline(x, y.transpose())(x_smooth)
-    yf_smooth = fft(y_smooth.transpose())
-    # Perform wavelet transform
-    wavelet = 'db4'
-    coeffs = pywt.wavedec(y_smooth.transpose(), wavelet)
+    wavelet = 'mexh'
+    scales = np.arange(1, 51)  # Define the range of scales
+    dt = x_smooth[1] - x_smooth[0]
+
+    coeffs, freqs = pywt.cwt(y_smooth.transpose(), scales, wavelet, sampling_period=dt)
 
     # Thresholding
-    threshold = 0.01  # Set your threshold value here
-    coeffs_thresh = [pywt.threshold(c, threshold, mode='soft') for c in coeffs]
+    threshold = 0.1  # Set your threshold value here
+    coeffs_thresh = pywt.threshold(coeffs, threshold, mode='soft')
 
-    # Reconstructing the signal
-    yf_smooth = pywt.waverec(coeffs_thresh, wavelet)
-    yf_info = np.array([abs(yf_smooth[i, :50]) for i in range(yf_smooth.shape[0])])
+    yf_smooth = np.sum(coeffs_thresh, axis=2).T
+
+    yf_info = np.array([abs(yf_smooth[i, :]) for i in range(yf_smooth.shape[0])])
 
     for i in range(len(yf_info)):
         if yf_info[i].max() == 0:
@@ -285,16 +273,20 @@ def differential_frequency(dataset1,dataset2,dataset1_name,dataset2_name,feature
     x_smooth = np.linspace(start=x.min(), stop=x.max(), num=100)
     y_smooth = make_interp_spline(x, y.transpose())(x_smooth)
     # Perform wavelet transform
-    wavelet = 'db4'
-    coeffs = pywt.wavedec(y_smooth.transpose(), wavelet)
+    wavelet = 'mexh'
+    scales = np.arange(1, 51)  # Define the range of scales
+    dt = x_smooth[1] - x_smooth[0]
+
+    coeffs, freqs = pywt.cwt(y_smooth.transpose(), scales, wavelet, sampling_period=dt)
 
     # Thresholding
-    threshold = 0.01  # Set your threshold value here
-    coeffs_thresh = [pywt.threshold(c, threshold, mode='soft') for c in coeffs]
+    threshold = 0.1  # Set your threshold value here
+    coeffs_thresh = pywt.threshold(coeffs, threshold, mode='soft')
 
-    # Reconstructing the signal
-    yf_smooth = pywt.waverec(coeffs_thresh, wavelet)
-    yf_info = np.array([abs(yf_smooth[i, :50]) for i in range(yf_smooth.shape[0])])
+
+    yf_smooth = np.sum(coeffs_thresh, axis=2).T
+
+    yf_info = np.array([abs(yf_smooth[i, :]) for i in range(yf_smooth.shape[0])])
 
     for i in range(len(yf_info)):
         if yf_info[i].max() == 0:
@@ -398,23 +390,26 @@ def show_result_spatial(adata_s, start, end,latent='ALL_mu.npy'):
     x_smooth = np.linspace(start=x.min(), stop=x.max(), num=100)
     y_smooth = make_interp_spline(x, trajectory_array, k=3)(x_smooth)
 
-    yf_smooth = fft(y_smooth.transpose())
-    # Perform wavelet transform
-    wavelet = 'db4'
-    coeffs = pywt.wavedec(y_smooth.transpose(), wavelet)
+    wavelet = 'mexh'
+    scales = np.arange(1, 51)  # Define the range of scales
+    dt = x_smooth[1] - x_smooth[0]
+
+    coeffs, freqs = pywt.cwt(y_smooth.transpose(), scales, wavelet, sampling_period=dt)
 
     # Thresholding
-    threshold = 0.01  # Set your threshold value here
-    coeffs_thresh = [pywt.threshold(c, threshold, mode='soft') for c in coeffs]
+    threshold = 0.1  # Set your threshold value here
+    coeffs_thresh = pywt.threshold(coeffs, threshold, mode='soft')
 
-    # Reconstructing the signal
-    yf_smooth = pywt.waverec(coeffs_thresh, wavelet)
-    yf_info = np.array([abs(yf_smooth[i, :50]) for i in range(yf_smooth.shape[0])])
+    yf_smooth = np.sum(coeffs_thresh, axis=2).T
+
+    yf_info = np.array([abs(yf_smooth[i, :]) for i in range(yf_smooth.shape[0])])
 
     for i in range(len(yf_info)):
         if yf_info[i].max() == 0:
             continue
         yf_info[i] = yf_info[i] / yf_info[i].max()
+
+    y_k = y_smooth.transpose()
 
     for i in range(len(y)):
         y[i, :] = y[i, :] - y[i, 0]
@@ -430,67 +425,57 @@ def show_result_spatial(adata_s, start, end,latent='ALL_mu.npy'):
     print_first = [0,0,0]
     for j in range(200):
         cluster_num = str(j)
-        cluster = adata.obs[adata.obs['leiden'] == cluster_num]['indexa']
+        cluster = adata.obs.loc[adata.obs['leiden'] == cluster_num, 'indexa'].to_numpy()
 
-        error_t = []
-        for i in range(len(cluster)):
-            error_t.append(np.max(y[cluster[i], :] - np.min(y[cluster[i], :])))
-
+        error_t = np.max(y[cluster, :], axis=1) - np.min(y[cluster, :], axis=1)
         error_index_t = np.argsort(error_t)
-        error_t = np.array(error_t)
-        num = 0
-        cluster_filter = []
-        yf_info_filter = []
-        cluater_index = []
-        name = []
-        for i in error_index_t[:]:
-            a = movingaverage(y[cluster[i], :], 5)
-            if abs(np.max(abs(a))) < 0.01 or abs(np.max(abs(a))) > 5:
-                continue
-            num = num + 1
-            cluster_filter.append(a)
-            cluater_index.append(cluster[i])
-            yf_info_filter.append(yf_info[cluster[i], :])
-            name.append(adata.obs_names[cluster[i]])
 
-        cluster_filter = np.array(cluster_filter)
-        cluater_index = np.array(cluater_index)
-        yf_info_filter = np.array(yf_info_filter)
+        cluster_filter, y_info_filter, yf_info_filter = [], [], []
+        cluater_index, name = [], []
+        for idx in error_index_t:
+            a = movingaverage(y[cluster[idx], :], 5)
+            if abs(np.max(np.abs(a))) < 0.01 or abs(np.max(np.abs(a))) > 5:
+                continue
+            cluster_filter.append(a)
+            y_info_filter.append(y_k[cluster[idx], :])
+            yf_info_filter.append(yf_info[cluster[idx], :])
+            cluater_index.append(cluster[idx])
+            name.append(adata.obs_names[cluster[idx]])
+
+        cluster_filter = np.asarray(cluster_filter)
+        y_info_filter = np.asarray(y_info_filter)
+        yf_info_filter = np.asarray(yf_info_filter)
+        cluater_index = np.asarray(cluater_index)
 
         color_map = ['b', 'r', 'y', 'c', 'g']
         n_cluster = 5
-        index = [[] for i in range(n_cluster)]
-        namei = [[] for i in range(n_cluster)]
+        index = [[] for _ in range(n_cluster)]
+        namei = [[] for _ in range(n_cluster)]
 
         if len(cluster_filter) >= 5:
             y_pred = KMeans(n_clusters=n_cluster, random_state=9).fit_predict(cluster_filter)
-            color = []
-            number_of_genes = np.zeros([n_cluster])
-            for i in range(len(y_pred)):
-                index[y_pred[i]].append(i)
-                namei[y_pred[i]].append(name[i])
-            for i in y_pred:
-                number_of_genes[i] = number_of_genes[i] + 1
-                color.append(color_map[i])
-            for i in range(len(cluster_filter)):
-                if number_of_genes[y_pred[i]] < 5:
-                    continue
+            number_of_genes = np.zeros(n_cluster, dtype=int)
+            for i, lab in enumerate(y_pred):
+                index[lab].append(i)
+                namei[lab].append(name[i])
+                number_of_genes[lab] += 1
 
-            cluster_num = cluster_num
-
-            avg = np.zeros([n_cluster, cluster_filter.shape[1]])
-            std = np.zeros([n_cluster, cluster_filter.shape[1]])
-            yf_avg = np.zeros([n_cluster, yf_info_filter.shape[1]])
+            avg = np.zeros((n_cluster, cluster_filter.shape[1]))
+            std = np.zeros_like(avg)
+            yf_avg = np.zeros((n_cluster, yf_info_filter.shape[1]))
             for i in range(n_cluster):
+                if len(index[i]) == 0:
+                    continue
                 avg[i] = np.mean(cluster_filter[index[i]], axis=0)
                 std[i] = np.std(cluster_filter[index[i]], axis=0)
                 yf_avg[i] = np.mean(yf_info_filter[index[i]], axis=0)
+
             m = 0
             for i in range(n_cluster):
                 if number_of_genes[i] < 5:
                     continue
                 plt.errorbar(x[:-4], avg[i], yerr=std[i], c=color_map[i], label='path' + str(m))
-                m = m + 1
+                m += 1
             plt.xlabel("Pseudotime", fontdict={'family': 'Arial', 'size': 18})
             plt.ylabel("Expression log2 fold change", fontdict={'family': 'Arial', 'size': 18})
             plt.title('cluster' + str(j), fontdict={'family': 'Arial', 'size': 18})
@@ -501,18 +486,13 @@ def show_result_spatial(adata_s, start, end,latent='ALL_mu.npy'):
                 plt.show()
                 print_first[0] = 0
             plt.close()
-            avgf_smooth = fft(avg.transpose())
-
-
-
 
             m = 0
             for i in range(n_cluster):
                 if number_of_genes[i] < 5:
                     continue
-                plt.plot(range(len(yf_avg[i])), yf_avg[i], c=color_map[i], label='path' + str(m))
-                m = m + 1
-
+                plt.plot(range(len(yf_avg[i])), yf_avg[i][::-1], c=color_map[i], label='path' + str(m))
+                m += 1
             plt.xlabel("Frequency", fontdict={'family': 'Arial', 'size': 18})
             plt.ylabel("Amplitude", fontdict={'family': 'Arial', 'size': 18})
             plt.title('cluster' + str(j), fontdict={'family': 'Arial', 'size': 18})
@@ -525,14 +505,27 @@ def show_result_spatial(adata_s, start, end,latent='ALL_mu.npy'):
             plt.close()
             plt.gcf().clear()
 
-            scales = np.arange(1, 128)
+            scales = np.arange(1, 51)
             m = 0
             for i in range(n_cluster):
                 if number_of_genes[i] < 5:
                     continue
-                plot_wavelet(x[:-4], yf_avg[i], scales, cluster_num, m, print_first[2])
+
+                plot_wavelet(x_smooth, y_info_filter[index[i]], scales, cluster_num, m, print_first[2])
                 print_first[2] = 0
-                m = m + 1
+                m += 1
+
+            mg = mygene.MyGeneInfo()
+            m = 0
+            for i in range(n_cluster):
+                if number_of_genes[i] < 5 or len(namei[i]) == 0:
+                    continue
+                gene_ids = mg.getgenes(namei[i], 'name, symbol, entrezgene', as_dataframe=True)
+                gene_ids.index.name = "UNIPROT"
+                gene_ids.reset_index(inplace=True)
+                gene_symbols = gene_ids['symbol']
+                gene_symbols.to_csv(f'Gene_{cluster_num}_path_{m}.csv', index=False)
+                m += 1
 
 
 
@@ -573,19 +566,19 @@ def differential_frequency_spatial(adata, start1, end1, start2, end2, direction1
     y_smooth = make_interp_spline(x, trajectory_array, k=3)(x_smooth)
 
     # Perform continuous wavelet transform
-    wavelet = 'mexh'  # Morlet wavelet for continuous wavelet transform
-    scales = np.arange(1, 128)  # Define the range of scales
-    coeffs, freqs = pywt.cwt(y_smooth.transpose(), scales, wavelet)
+    wavelet = 'mexh'
+    scales = np.arange(1, 51)  # Define the range of scales
+    dt = x_smooth[1] - x_smooth[0]
+
+    coeffs, freqs = pywt.cwt(y_smooth.transpose(), scales, wavelet, sampling_period=dt)
 
     # Thresholding
-    threshold = 0.01  # Set your threshold value here
+    threshold = 0.1  # Set your threshold value here
     coeffs_thresh = pywt.threshold(coeffs, threshold, mode='soft')
 
-    # Reconstructing the signal
-    yf_smooth = np.zeros_like(y_smooth.transpose())
-    yf_smooth = np.sum(coeffs_thresh, axis=0)
+    yf_smooth = np.sum(coeffs_thresh, axis=2).T
 
-    yf_info = np.array([abs(yf_smooth[i, :50]) for i in range(yf_smooth.shape[0])])
+    yf_info = np.array([abs(yf_smooth[i, :]) for i in range(yf_smooth.shape[0])])
 
     for i in range(len(yf_info)):
         if yf_info[i].max() == 0:
@@ -628,19 +621,19 @@ def differential_frequency_spatial(adata, start1, end1, start2, end2, direction1
     y_smooth = make_interp_spline(x, trajectory_array, k=3)(x_smooth)
 
     # Perform continuous wavelet transform
-    wavelet = 'mexh'  # Morlet wavelet for continuous wavelet transform
-    scales = np.arange(1, 128)  # Define the range of scales
-    coeffs, freqs = pywt.cwt(y_smooth.transpose(), scales, wavelet)
+    wavelet = 'mexh'
+    scales = np.arange(1, 51)  # Define the range of scales
+    dt = x_smooth[1] - x_smooth[0]
+
+    coeffs, freqs = pywt.cwt(y_smooth.transpose(), scales, wavelet, sampling_period=dt)
 
     # Thresholding
-    threshold = 0.01  # Set your threshold value here
+    threshold = 0.1  # Set your threshold value here
     coeffs_thresh = pywt.threshold(coeffs, threshold, mode='soft')
 
-    # Reconstructing the signal
-    yf_smooth = np.zeros_like(y_smooth.transpose())
-    yf_smooth = np.sum(coeffs_thresh, axis=0)
+    yf_smooth = np.sum(coeffs_thresh, axis=2).T
 
-    yf_info = np.array([abs(yf_smooth[i, :50]) for i in range(yf_smooth.shape[0])])
+    yf_info = np.array([abs(yf_smooth[i, :]) for i in range(yf_smooth.shape[0])])
 
     for i in range(len(yf_info)):
         if yf_info[i].max() == 0:

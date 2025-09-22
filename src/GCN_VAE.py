@@ -135,7 +135,7 @@ class GCN_VAE(torch.nn.Module):
 
         loss = reconstruction_loss + 0.05 * latent_loss
 
-        return reconstruction_loss
+        return loss
 
 
     def forward(self, data):
@@ -166,6 +166,9 @@ class GCN_VAE_Graph(torch.nn.Module):
     def __init__(self, latent_size = 20):
         super().__init__()
         self.latent_size = latent_size
+        self.conv1 = GCNConv(100, 100)
+        self.conv2 = GCNConv(50, 50)
+        self.conv3 = GCNConv(100, 100)
         self.encoder_forward1 = nn.Sequential(
             nn.Linear(100 ,70),
             nn.LeakyReLU(),
@@ -240,7 +243,7 @@ class GCN_VAE_Graph(torch.nn.Module):
 
         loss = reconstruction_loss + 0.05 * latent_loss
 
-        return reconstruction_loss
+        return loss
 
 
     def forward(self, data):
@@ -307,7 +310,7 @@ def benchmark(adata):
     print("ALL: CH: " + str(CHscore) + " Silhoutte: " + str(Silscore) + " DB: " + str(DBscore) + " Dunn: " + str(Dunnscore))
 
 
-def GeneRhythm_Model(input_data,graph=None, model_output='ALL_mu.npy', latent_output='gcn_vae.pth', sc_data, lr=0.00005, n_epoch=1000, batch_size=32):
+def GeneRhythm_Model(input_data,graph=None, model_output='gcn_vae.pth', latent_output='ALL_mu.npy', sc_data=None, lr=0.00005, n_epoch=1000, batch_size=32):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     device = torch.device(device)
 
