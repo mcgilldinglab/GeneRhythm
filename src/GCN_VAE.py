@@ -241,7 +241,7 @@ class GCN_VAE_Graph(torch.nn.Module):
 
         latent_loss = torch.mean(0.5 * (log_var.exp() + torch.square(mu) - log_var).sum(dim=1))
 
-        loss = reconstruction_loss + 0.05 * latent_loss
+        loss = reconstruction_loss + 0.005 * latent_loss
 
         return loss
 
