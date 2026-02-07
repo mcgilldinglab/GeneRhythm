@@ -19,7 +19,7 @@ Temporal gene expression programs underlie many genetic and cellular processes, 
 
 7. Perform rhythmic perturbation to research diseases related drug and pathway targets.
 
-8. Achieve rhytimic signal's sonification.
+8. Achieve rhythmic signal sonification from time–frequency features into musical parameters.
  
 
 
@@ -56,4 +56,4 @@ Please check the tutorial directory of the repository.
 
 * [Tutorial for GeneRhythm gene clustering and differential frequency biomarker finding on Spatial data](https://github.com/mcgilldinglab/GeneRhythm/blob/main/tutorial/Spatial_LIBD_human_dorsolateral_prefrontal_cortex.ipynb)
 
-* [Tutorial for GeneRhythm perturbation](https://github.com/mcgilldinglab/GeneRhythm/blob/main/tutorial/scRNA-seq_PDAC_perturbation.ipynb)
+* [Tutorial for GeneRhythm PDAC disease perturbation on single-cell RNA-seq data](https://github.com/mcgilldinglab/GeneRhythm/blob/main/tutorial/scRNA-seq_PDAC_perturbation.ipynb)
