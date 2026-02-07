@@ -1,7 +1,7 @@
 # GeneRhythm
 ## Overview
 <img title="Model Overview" alt="Alt text" src="/figures/main.png">
-Gene expression dynamics are central to biological processes such as cell differentiation, disease progression, and tissue remodeling. Most analyses focus on changes in the time domain, overlooking frequency associated patterns that may reveal distinct regulatory mechanisms. We introduce GeneRhythm, a deep learning framework that defines and extracts gene rhythm, a novel feature that quantifies the frequency of gene expression changes via wavelet transformation. By modeling gene expression in time and frequency domains, GeneRhythm captures transcriptional programs missed by conventional methods. We show that gene rhythm improves gene clustering by grouping rhythmically similar genes into functionally coherent modules. It also identifies rhythm differential genes, which have similar expression levels but distinct rhythmic patterns that reveal complementary biological insights. Applied to spatial transcriptomics, GeneRhythm reveals spatially organized rhythmic patterns reflecting tissue structure. GeneRhythm provides a generalizable and frequency aware framework for uncovering dynamic regulatory programs in single cell and spatial omics data.
+Temporal gene expression programs underlie many genetic and cellular processes, yet most analytical approaches interrogate these dynamics primarily in the time domain, limiting sensitivity to rhythmic and frequency-specific regulation. Here, we present GeneRhythm, a deep learning framework that integrates wavelet-based time–frequency decomposition to model gene expression dynamics across biological conditions. GeneRhythm enables accurate gene clustering based on shared rhythmic patterns and identifies rhythm-differential genes whose dynamic behaviors differ between conditions despite minimal changes in mean expression, revealing coordinated oscillatory programs and phase-shifted regulation missed by differential expression and trajectory-based analyses. Beyond analytical inference, GeneRhythm translates gene expression dynamics into structured, playable musical scores, enabling direct auditory exploration of molecular dynamics, in which rhythmic patterns and temporal progression are mathematically derived from wavelet-resolved signals. By explicitly modeling rhythm and frequency and translating gene expression dynamics into structured musical representations, GeneRhythm provides a new lens for interrogating dysregulated temporal programs that underlie complex disease states.
 
 ## Key Capabilities
 
@@ -16,6 +16,11 @@ Gene expression dynamics are central to biological processes such as cell differ
 5. Expand the frequency information analysis to Multi-omics data and get frequency primed genes.
 
 6. Explore the bio-insight of the genes identified with frequency inforamtion.
+
+7. Perform rhythmic perturbation to research diseases related drug and pathway targets.
+
+8. Achieve rhytimic signal's sonification.
+ 
 
 
 
@@ -50,3 +55,5 @@ Please check the tutorial directory of the repository.
 * [Tutorial for GeneRhythm gene clustering and differential frequency biomarker finding on single-cell ATAC-seq data](https://github.com/mcgilldinglab/GeneRhythm/blob/main/tutorial/scATAC-seq_mouse_atherosclerotic_plaque_immune_cells.ipynb)
 
 * [Tutorial for GeneRhythm gene clustering and differential frequency biomarker finding on Spatial data](https://github.com/mcgilldinglab/GeneRhythm/blob/main/tutorial/Spatial_LIBD_human_dorsolateral_prefrontal_cortex.ipynb)
+
+* [Tutorial for GeneRhythm perturbation](https://github.com/mcgilldinglab/GeneRhythm/blob/main/tutorial/scRNA-seq_PDAC_perturbation.ipynb)
