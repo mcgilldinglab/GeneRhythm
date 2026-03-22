@@ -3,6 +3,7 @@
 <img title="Model Overview" alt="Alt text" src="/figures/main.png">
 Temporal gene expression programs underlie many genetic and cellular processes, yet most analytical approaches interrogate these dynamics primarily in the time domain, limiting sensitivity to rhythmic and frequency-specific regulation. Here, we present GeneRhythm, a deep learning framework that integrates wavelet-based time–frequency decomposition to model gene expression dynamics across biological conditions. GeneRhythm enables accurate gene clustering based on shared rhythmic patterns and identifies rhythm-differential genes whose dynamic behaviors differ between conditions despite minimal changes in mean expression, revealing coordinated oscillatory programs and phase-shifted regulation missed by differential expression and trajectory-based analyses. Beyond analytical inference, GeneRhythm translates gene expression dynamics into structured, playable musical scores, enabling direct auditory exploration of molecular dynamics, in which rhythmic patterns and temporal progression are mathematically derived from wavelet-resolved signals. By explicitly modeling rhythm and frequency and translating gene expression dynamics into structured musical representations, GeneRhythm provides a new lens for interrogating dysregulated temporal programs that underlie complex disease states.
 
+
 For detailed instructions, comprehensive documentation, and helpful tutorials, please visit:
   
 * [https://generhythm.readthedocs.io](https://generhythm.readthedocs.io/)
