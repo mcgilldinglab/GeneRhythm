@@ -25,11 +25,7 @@ nbsphinx_allow_errors = False
 
 html_theme = "sphinx_rtd_theme"
 html_title = "GeneRhythm Docs"
-html_theme_options = {
-    "navigation_depth": 1,
-    "collapse_navigation": True,
-    "titles_only": True,
-}
+
 
 html_context = {
     "display_github": False,
