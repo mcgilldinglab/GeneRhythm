@@ -22,7 +22,4 @@ pip3 install -r requirements.txt
 
 The repository currently lists its Python dependencies in `requirements.txt`.
 
-## Notes
 
-- The tutorials are available in the notebook section of this documentation site.
-- Notebook pages are rendered for reading only and are not executed during documentation builds.
