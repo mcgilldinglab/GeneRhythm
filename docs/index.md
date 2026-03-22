@@ -24,5 +24,5 @@ Temporal gene expression programs underlie many genetic and cellular processes, 
 :caption: Contents
 
 installation
-notebooks
+tutorials
 ```
