@@ -518,7 +518,7 @@ def differential_frequency(dataset1,dataset2,dataset1_name,dataset2_name,feature
     coeffs, freqs = pywt.cwt(y_smooth.transpose(), scales, wavelet, sampling_period=dt)
 
     # Thresholding
-    threshold = 0.1  # Set your threshold value here
+    threshold = 0.01  # Set your threshold value here
     coeffs_thresh = pywt.threshold(coeffs, threshold, mode='soft')
 
     yf_smooth = np.sum(coeffs_thresh, axis=2).T
@@ -551,7 +551,7 @@ def differential_frequency(dataset1,dataset2,dataset1_name,dataset2_name,feature
     coeffs, freqs = pywt.cwt(y_smooth.transpose(), scales, wavelet, sampling_period=dt)
 
     # Thresholding
-    threshold = 0.1  # Set your threshold value here
+    threshold = 0.01  # Set your threshold value here
     coeffs_thresh = pywt.threshold(coeffs, threshold, mode='soft')
 
 
@@ -633,7 +633,7 @@ def show_result_spatial(
     moving_avg_window=5,
     waveletname="mexh",
     wavelet_scales=np.arange(1, 51),
-    wavelet_threshold=0.1,
+    wavelet_threshold=0.01,
     export_musicxml=True,
     musicxml_out_dir="musicxml_spatial",
     musicxml_tempo_bpm=60.0,
@@ -893,7 +893,7 @@ def differential_frequency_spatial(adata, start1, end1, start2, end2, direction1
     coeffs, freqs = pywt.cwt(y_smooth.transpose(), scales, wavelet, sampling_period=dt)
 
     # Thresholding
-    threshold = 0.1  # Set your threshold value here
+    threshold = 0.01  # Set your threshold value here
     coeffs_thresh = pywt.threshold(coeffs, threshold, mode='soft')
 
     yf_smooth = np.sum(coeffs_thresh, axis=2).T
@@ -948,7 +948,7 @@ def differential_frequency_spatial(adata, start1, end1, start2, end2, direction1
     coeffs, freqs = pywt.cwt(y_smooth.transpose(), scales, wavelet, sampling_period=dt)
 
     # Thresholding
-    threshold = 0.1  # Set your threshold value here
+    threshold = 0.01  # Set your threshold value here
     coeffs_thresh = pywt.threshold(coeffs, threshold, mode='soft')
 
     yf_smooth = np.sum(coeffs_thresh, axis=2).T
@@ -1044,7 +1044,7 @@ def run_diff_wavelet_musicxml_pipeline(
     outdir_mxml_flute="out_musicxml_flute",
     outdir_mxml_violin="out_musicxml_violin",
     wavelet_name="mexh",
-    threshold=0.1,
+    threshold=0.01,
     scales=np.arange(1, 51),
     padj_cutoff=0.05,
     abs_logfc_cutoff=1.0,
