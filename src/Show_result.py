@@ -1045,7 +1045,7 @@ def run_diff_wavelet_musicxml_pipeline(
     outdir_mxml_violin="out_musicxml_violin",
     wavelet_name="mexh",
     threshold=0.1,
-    scales=np.arange(1, 128),
+    scales=np.arange(1, 51),
     padj_cutoff=0.05,
     abs_logfc_cutoff=1.0,
     keep_only_positive_diff=True,
