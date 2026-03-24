@@ -329,7 +329,7 @@ def GeneRhythm_Model(input_data,graph=None, model_output='gcn_vae.pth', latent_o
     else:
         data = Data(x=x)
 
-    data_loader = DataLoader(dataset=[data], batch_size=1, shuffle=False)
+    data_loader = DataLoader(dataset=[data], batch_size=batch_size, shuffle=False)
     # train VAE
     if graph:
         gcn_vae = GCN_VAE_Graph().to(device)
