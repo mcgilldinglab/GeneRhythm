@@ -323,7 +323,25 @@ def GeneRhythm_Model(input_data,graph=None, model_output='gcn_vae.pth', latent_o
     lr = lr
 
 
-    x = torch.tensor(np.float32(np.load(input_data)))
+    x_np = np.float32(np.load(input_data))
+
+
+    x1_np = x_np[:, :100]
+    x2_np = x_np[:, 100:150]
+    x3_np = x_np[:, 150:]
+
+
+    x3_min = x3_np.min(axis=0, keepdims=True)
+    x3_max = x3_np.max(axis=0, keepdims=True)
+    x3_range = x3_max - x3_min
+    x3_range[x3_range == 0] = 1.0  
+
+    x3_np = (x3_np - x3_min) / x3_range
+
+
+    x_np = np.concatenate([x1_np, x2_np, x3_np], axis=1)
+
+    x = torch.tensor(x_np, dtype=torch.float32)
 
     if graph:
         edge_index = torch.tensor(np.load(graph).transpose(), dtype=torch.long)
