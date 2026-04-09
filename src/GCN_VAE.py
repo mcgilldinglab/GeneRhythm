@@ -62,33 +62,31 @@ class GCN_VAE(torch.nn.Module):
     def __init__(self, latent_size = 20):
         super().__init__()
         self.latent_size = latent_size
+
         self.encoder_forward1 = nn.Sequential(
             nn.Linear(100 ,70),
             nn.LeakyReLU(),
             nn.Linear(70, 40),
             nn.LeakyReLU(),
-            nn.Linear(40, 20)
+            nn.Linear(40, 12)
         )
         self.encoder_forward2 = nn.Sequential(
             nn.Linear(50, 40),
             nn.LeakyReLU(),
             nn.Linear(40, 30),
             nn.LeakyReLU(),
-            nn.Linear(30, 20)
+            nn.Linear(30, 12)
         )
         self.encoder_forward3 = nn.Sequential(
             nn.Linear(100, 70),
             nn.LeakyReLU(),
             nn.Linear(70, 40),
             nn.LeakyReLU(),
-            nn.Linear(40, 20)
+            nn.Linear(40, 12)
         )
-        self.FC = nn.Sequential(
-            nn.Linear(30, 20),
-            nn.ReLU()
-        )
+     
         self.decoder_forward1 = nn.Sequential(
-            nn.Linear(20, 40),
+            nn.Linear(18, 40),
             nn.LeakyReLU(),
             nn.Linear(40, 70),
             nn.LeakyReLU(),
@@ -96,7 +94,7 @@ class GCN_VAE(torch.nn.Module):
             nn.Sigmoid()
         )
         self.decoder_forward2 = nn.Sequential(
-            nn.Linear(20, 30),
+            nn.Linear(18, 30),
             nn.LeakyReLU(),
             nn.Linear(30, 40),
             nn.LeakyReLU(),
@@ -104,7 +102,7 @@ class GCN_VAE(torch.nn.Module):
             nn.Sigmoid()
         )
         self.decoder_forward3 = nn.Sequential(
-            nn.Linear(20, 40),
+            nn.Linear(18, 40),
             nn.LeakyReLU(),
             nn.Linear(40, 70),
             nn.LeakyReLU(),
@@ -128,30 +126,34 @@ class GCN_VAE(torch.nn.Module):
         z = mu + epsilon * torch.sqrt(log_var.exp())
         return z
 
-    def loss(self, X, mu_prime, mu, log_var):
-        reconstruction_loss = torch.mean(torch.square(X - mu_prime).sum(dim=1))
+    def loss(self, X, mu_prime, mu, log_var, beta=1.0):
+        # reconstruction term
+        reconstruction_loss = torch.mean(torch.sum((X - mu_prime) ** 2, dim=1))
 
-        latent_loss = torch.mean(0.5 * (log_var.exp() + torch.square(mu) - log_var).sum(dim=1))
+        # KL divergence to N(0, I)
+        kl_loss = torch.mean(
+            -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp(), dim=1)
+        )
 
-        loss = reconstruction_loss + 0.05 * latent_loss
+        total_loss = reconstruction_loss + 0.0005 * kl_loss
 
-        return loss
-
+        return total_loss
 
     def forward(self, data):
-        x = data.x
+        x, edge_index = data.x, data.edge_index
         print(x.shape)
         x1 = x[:, :100]
         x2 = x[:, 100:150]
         x3 = x[:, 150:]
-        mu1, log_var1 = self.encoder(x1, self.encoder_forward1, 10)
-        mu2, log_var2 = self.encoder(x2, self.encoder_forward2, 10)
-        mu3, log_var3 = self.encoder(x3, self.encoder_forward3, 10)
+  
+        mu1, log_var1 = self.encoder(x1, self.encoder_forward1, 6)
+        mu2, log_var2 = self.encoder(x2, self.encoder_forward2, 6)
+        mu3, log_var3 = self.encoder(x3, self.encoder_forward3, 6)
         z1 = self.reparameterization(mu1, log_var1)
         z2 = self.reparameterization(mu2, log_var2)
         z3 = self.reparameterization(mu3, log_var3)
         z = torch.cat((z1, z2, z3), dim=1)
-        z = self.FC(z)
+  
         mu_prime1 = self.decoder(z, self.decoder_forward1)
         mu_prime2 = self.decoder(z, self.decoder_forward2)
         mu_prime3 = self.decoder(z, self.decoder_forward3)
@@ -160,6 +162,7 @@ class GCN_VAE(torch.nn.Module):
         r3 = [mu_prime3, mu3, log_var3]
 
         return r1, r2, r3, z
+
 
 
 class GCN_VAE_Graph(torch.nn.Module):
@@ -174,28 +177,25 @@ class GCN_VAE_Graph(torch.nn.Module):
             nn.LeakyReLU(),
             nn.Linear(70, 40),
             nn.LeakyReLU(),
-            nn.Linear(40, 20)
+            nn.Linear(40, 12)
         )
         self.encoder_forward2 = nn.Sequential(
             nn.Linear(50, 40),
             nn.LeakyReLU(),
             nn.Linear(40, 30),
             nn.LeakyReLU(),
-            nn.Linear(30, 20)
+            nn.Linear(30, 12)
         )
         self.encoder_forward3 = nn.Sequential(
             nn.Linear(100, 70),
             nn.LeakyReLU(),
             nn.Linear(70, 40),
             nn.LeakyReLU(),
-            nn.Linear(40, 20)
+            nn.Linear(40, 12)
         )
-        self.FC = nn.Sequential(
-            nn.Linear(30, 20),
-            nn.ReLU()
-        )
+     
         self.decoder_forward1 = nn.Sequential(
-            nn.Linear(20, 40),
+            nn.Linear(18, 40),
             nn.LeakyReLU(),
             nn.Linear(40, 70),
             nn.LeakyReLU(),
@@ -203,7 +203,7 @@ class GCN_VAE_Graph(torch.nn.Module):
             nn.Sigmoid()
         )
         self.decoder_forward2 = nn.Sequential(
-            nn.Linear(20, 30),
+            nn.Linear(18, 30),
             nn.LeakyReLU(),
             nn.Linear(30, 40),
             nn.LeakyReLU(),
@@ -211,7 +211,7 @@ class GCN_VAE_Graph(torch.nn.Module):
             nn.Sigmoid()
         )
         self.decoder_forward3 = nn.Sequential(
-            nn.Linear(20, 40),
+            nn.Linear(18, 40),
             nn.LeakyReLU(),
             nn.Linear(40, 70),
             nn.LeakyReLU(),
@@ -235,20 +235,21 @@ class GCN_VAE_Graph(torch.nn.Module):
         z = mu + epsilon * torch.sqrt(log_var.exp())
         return z
 
-    def loss(self, X, mu_prime, mu, log_var):
+    def loss(self, X, mu_prime, mu, log_var, beta=1.0):
+        # reconstruction term
+        reconstruction_loss = torch.mean(torch.sum((X - mu_prime) ** 2, dim=1))
 
-        reconstruction_loss = torch.mean(torch.square(X - mu_prime).sum(dim=1))
+        # KL divergence to N(0, I)
+        kl_loss = torch.mean(
+            -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp(), dim=1)
+        )
 
-        latent_loss = torch.mean(0.5 * (log_var.exp() + torch.square(mu) - log_var).sum(dim=1))
+        total_loss = reconstruction_loss + 0.0005 * kl_loss
 
-        loss = reconstruction_loss + 0.005 * latent_loss
-
-        return loss
-
+        return total_loss
 
     def forward(self, data):
         x, edge_index = data.x, data.edge_index
-        #x = data.x
         print(x.shape)
         x1 = x[:, :100]
         x2 = x[:, 100:150]
@@ -256,14 +257,14 @@ class GCN_VAE_Graph(torch.nn.Module):
         x1 = self.conv1(x1, edge_index)
         x2 = self.conv2(x2, edge_index)
         x3 = self.conv3(x3, edge_index)
-        mu1, log_var1 = self.encoder(x1, self.encoder_forward1, 10)
-        mu2, log_var2 = self.encoder(x2, self.encoder_forward2, 10)
-        mu3, log_var3 = self.encoder(x3, self.encoder_forward3, 10)
+        mu1, log_var1 = self.encoder(x1, self.encoder_forward1, 6)
+        mu2, log_var2 = self.encoder(x2, self.encoder_forward2, 6)
+        mu3, log_var3 = self.encoder(x3, self.encoder_forward3, 6)
         z1 = self.reparameterization(mu1, log_var1)
         z2 = self.reparameterization(mu2, log_var2)
         z3 = self.reparameterization(mu3, log_var3)
         z = torch.cat((z1, z2, z3), dim=1)
-        z = self.FC(z)
+  
         mu_prime1 = self.decoder(z, self.decoder_forward1)
         mu_prime2 = self.decoder(z, self.decoder_forward2)
         mu_prime3 = self.decoder(z, self.decoder_forward3)
@@ -274,18 +275,20 @@ class GCN_VAE_Graph(torch.nn.Module):
         return r1, r2, r3, z
 
 
+
 def train(model, optimizer, data_loader, device, name='GCN_VAE'):
     model.train()
 
     total_loss = 0
     for X in data_loader:
+
         X = X.to(device)
         model.zero_grad()
         r1, r2, r3, z = model(X)
 
         loss = model.loss(X.x[:, :100], r1[0], r1[1], r1[2])
         loss += model.loss(X.x[:, 100:150], r2[0], r2[1], r2[2])
-        loss += 0.001*model.loss(X.x[:, 150:], r3[0], r3[1], r3[2])
+        loss += model.loss(X.x[:, 150:], r3[0], r3[1], r3[2])
 
         loss.backward()
         optimizer.step()
