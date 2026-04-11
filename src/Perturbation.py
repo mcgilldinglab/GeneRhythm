@@ -120,8 +120,12 @@ def Gene_Perturbation(
             _, _, _, z = model(data)
         return z.detach().cpu().numpy()
 
-    def centroid_dist(A, B):
-        return float(np.linalg.norm(A.mean(axis=0) - B.mean(axis=0)))
+    def mean_euclidean_dist(A, B):
+        A = np.asarray(A, dtype=float)
+        B = np.asarray(B, dtype=float)
+        if A.shape != B.shape:
+            raise ValueError(f"Shape mismatch: {A.shape} vs {B.shape}")
+        return float(np.linalg.norm(A - B, axis=1).mean())
 
     def knockout_traj(traj_df, gi, gname):
         df = traj_df.copy()
@@ -171,9 +175,9 @@ def Gene_Perturbation(
     z_base = to_latent_z(feats_base)
 
     # ---- baseline distances (compute all, but will use only d2) ----
-    dist_base_1 = centroid_dist(z_base[:100], z_control[:100])
-    dist_base_2 = centroid_dist(z_base[100:150], z_control[100:150])
-    dist_base_3 = centroid_dist(z_base[150:], z_control[150:])
+    dist_base_1 = mean_euclidean_dist(z_base[:100], z_control[:100])
+    dist_base_2 = mean_euclidean_dist(z_base[100:150], z_control[100:150])
+    dist_base_3 = mean_euclidean_dist(z_base[150:], z_control[150:])
 
     # ---- genes ----
     if gene_names is None:
@@ -195,9 +199,9 @@ def Gene_Perturbation(
 
         z_ko = to_latent_z(feats_ko)
 
-        dist_pert_1 = centroid_dist(z_ko[:100], z_control[:100])
-        dist_pert_2 = centroid_dist(z_ko[100:150], z_control[100:150])
-        dist_pert_3 = centroid_dist(z_ko[150:], z_control[150:])
+        dist_pert_1 = mean_euclidean_dist(z_ko[:100], z_control[:100])
+        dist_pert_2 = mean_euclidean_dist(z_ko[100:150], z_control[100:150])
+        dist_pert_3 = mean_euclidean_dist(z_ko[150:], z_control[150:])
 
         # distances deltas
         d1 = dist_pert_1 - dist_base_1
@@ -312,7 +316,7 @@ def Pathway_Drug_Perturbation(
     (e.g. biological pathway or drug-induced signature) by:
       1) multiplicatively perturbing gene expression and trajectory profiles,
       2) projecting perturbed data into a pretrained latent space,
-      3) measuring centroid shifts relative to baseline,
+      3) measuring shifts relative to baseline,
       4) estimating empirical p-values using a size-matched random-gene null.
 
     Parameters
@@ -488,8 +492,12 @@ def Pathway_Drug_Perturbation(
             _, _, _, z = gcn_vae(data)
         return z.detach().cpu().numpy()
 
-    def _centroid_dist(A, B):
-        return float(np.linalg.norm(A.mean(axis=0) - B.mean(axis=0)))
+    def _mean_euclidean_dist(A, B):
+        A = np.asarray(A, dtype=float)
+        B = np.asarray(B, dtype=float)
+        if A.shape != B.shape:
+            raise ValueError(f"Shape mismatch: {A.shape} vs {B.shape}")
+        return float(np.linalg.norm(A - B, axis=1).mean())
 
     def _pick_factor_from_sign(s: int) -> float:
         if s > 0:
@@ -574,9 +582,9 @@ def Pathway_Drug_Perturbation(
     z_control = _to_latent_z(feats_ctrl)
     z_base = _to_latent_z(feats_base)
 
-    dist_base_1 = _centroid_dist(z_base[:100], z_control[:100])
-    dist_base_2 = _centroid_dist(z_base[100:150], z_control[100:150])
-    dist_base_3 = _centroid_dist(z_base[150:], z_control[150:])
+    dist_base_1 = _mean_euclidean_dist(z_base[:100], z_control[:100])
+    dist_base_2 = _mean_euclidean_dist(z_base[100:150], z_control[100:150])
+    dist_base_3 = _mean_euclidean_dist(z_base[150:], z_control[150:])
 
     _log(f"[INFO] baseline dists: {dist_base_1:.4f}, {dist_base_2:.4f}, {dist_base_3:.4f}")
 
@@ -719,9 +727,9 @@ def Pathway_Drug_Perturbation(
 
         try:
             z_b = _forward_once(traj_b, ad_b_T)
-            d1 = _centroid_dist(z_b[:100], z_control[:100])
-            d2 = _centroid_dist(z_b[100:150], z_control[100:150])
-            d3 = _centroid_dist(z_b[150:], z_control[150:])
+            d1 = _mean_euclidean_dist(z_b[:100], z_control[:100])
+            d2 = _mean_euclidean_dist(z_b[100:150], z_control[100:150])
+            d3 = _mean_euclidean_dist(z_b[150:], z_control[150:])
             delta_b = 0.5 * (d1 - dist_base_1) + (d2 - dist_base_2) + 0.5 * (d3 - dist_base_3)
         except Exception:
             delta_b = 0.0
@@ -781,9 +789,9 @@ def Pathway_Drug_Perturbation(
 
             z_pert = _forward_once(traj_pert, ad_pert_T)
 
-            d1 = _centroid_dist(z_pert[:100], z_control[:100])
-            d2 = _centroid_dist(z_pert[100:150], z_control[100:150])
-            d3 = _centroid_dist(z_pert[150:], z_control[150:])
+            d1 = _mean_euclidean_dist(z_pert[:100], z_control[:100])
+            d2 = _mean_euclidean_dist(z_pert[100:150], z_control[100:150])
+            d3 = _mean_euclidean_dist(z_pert[150:], z_control[150:])
             delta = d2 - dist_base_2
         except Exception:
             return None
