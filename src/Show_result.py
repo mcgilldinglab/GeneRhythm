@@ -601,18 +601,7 @@ def differential_frequency(dataset1,dataset2,dataset1_name,dataset2_name,feature
                                     save=save_name)
 
 
-    ranked_genes = adata.uns['rank_genes_groups']
 
-    filtered_genes = ranked_genes['pvals_adj'][dataset1_name] < 0.05
-
-    filtered_genes_info = pd.DataFrame({
-        'gene': ranked_genes['names'][dataset1_name][filtered_genes],
-        'logfoldchange': ranked_genes['logfoldchanges'][dataset1_name][filtered_genes],
-        'pval': ranked_genes['pvals'][dataset1_name][filtered_genes],
-        'pval_adj': ranked_genes['pvals_adj'][dataset1_name][filtered_genes]
-    })
-
-    save_name_csv = 'filtered_genes_pval_adj_0.05_'+dataset1_name+'_vs_'+dataset2_name+'.csv'
 
 
 
@@ -998,18 +987,6 @@ def differential_frequency_spatial(adata, start1, end1, start2, end2, direction1
                                     save=save_name)
 
 
-    ranked_genes = adata.uns['rank_genes_groups']
-
-    filtered_genes = ranked_genes['pvals_adj'][dataset1_name] < 0.05
-
-    filtered_genes_info = pd.DataFrame({
-        'gene': ranked_genes['names'][dataset1_name][filtered_genes],
-        'logfoldchange': ranked_genes['logfoldchanges'][dataset1_name][filtered_genes],
-        'pval': ranked_genes['pvals'][dataset1_name][filtered_genes],
-        'pval_adj': ranked_genes['pvals_adj'][dataset1_name][filtered_genes]
-    })
-
-    save_name_csv = 'filtered_genes_pval_adj_0.05_'+dataset1_name+'_vs_'+dataset2_name+'.csv'
 
 
 
