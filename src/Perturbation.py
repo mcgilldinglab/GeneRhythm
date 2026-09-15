@@ -278,6 +278,7 @@ import torch
 import pywt
 from scipy.interpolate import make_interp_spline
 from joblib import Parallel, delayed
+import matplotlib.pyplot as plt
 from torch_geometric.data import Data
 from torch_geometric.utils import add_self_loops
 
@@ -307,6 +308,7 @@ def Pathway_Drug_Perturbation(
     scales=np.arange(1, 128),
     threshold=0.1,
     pca_n_comps=100,
+    plot_top=20,
     verbose=True,
 ):
     """
@@ -366,6 +368,8 @@ def Pathway_Drug_Perturbation(
         Must match your training/preprocessing settings for reproducibility.
     pca_n_comps : int
         Number of PCA components appended to trajectory features.
+    plot_top : int or None
+        If truthy, save a heatmap of the top terms ranked by FDR, matching the latest perturb_print behavior.
     verbose : bool
         Print progress logs.
 
@@ -492,12 +496,15 @@ def Pathway_Drug_Perturbation(
             _, _, _, z = gcn_vae(data)
         return z.detach().cpu().numpy()
 
-    def _mean_euclidean_dist(A, B):
+    def _centroid_dist(A, B):
+        """Euclidean distance between latent-space centroids (latest perturb_print logic)."""
         A = np.asarray(A, dtype=float)
         B = np.asarray(B, dtype=float)
-        if A.shape != B.shape:
-            raise ValueError(f"Shape mismatch: {A.shape} vs {B.shape}")
-        return float(np.linalg.norm(A - B, axis=1).mean())
+        if A.ndim != 2 or B.ndim != 2:
+            raise ValueError(f"Expected 2D latent arrays, got {A.shape} and {B.shape}")
+        if A.shape[1] != B.shape[1]:
+            raise ValueError(f"Latent dimension mismatch: {A.shape} vs {B.shape}")
+        return float(np.linalg.norm(A.mean(axis=0) - B.mean(axis=0)))
 
     def _pick_factor_from_sign(s: int) -> float:
         if s > 0:
@@ -582,9 +589,9 @@ def Pathway_Drug_Perturbation(
     z_control = _to_latent_z(feats_ctrl)
     z_base = _to_latent_z(feats_base)
 
-    dist_base_1 = _mean_euclidean_dist(z_base[:100], z_control[:100])
-    dist_base_2 = _mean_euclidean_dist(z_base[100:150], z_control[100:150])
-    dist_base_3 = _mean_euclidean_dist(z_base[150:], z_control[150:])
+    dist_base_1 = _centroid_dist(z_base[:100], z_control[:100])
+    dist_base_2 = _centroid_dist(z_base[100:150], z_control[100:150])
+    dist_base_3 = _centroid_dist(z_base[150:], z_control[150:])
 
     _log(f"[INFO] baseline dists: {dist_base_1:.4f}, {dist_base_2:.4f}, {dist_base_3:.4f}")
 
@@ -710,6 +717,8 @@ def Pathway_Drug_Perturbation(
         wavelet=str(wavelet),
         threshold=float(threshold),
         pca_n_comps=int(pca_n_comps),
+        distance_metric="latent_centroid_euclidean",
+        delta_formula="0.5*d1+d2+0.5*d3",
     )
     cfg_hash = _stable_hash(cfg)
     os.makedirs(cache_dir, exist_ok=True)
@@ -727,9 +736,9 @@ def Pathway_Drug_Perturbation(
 
         try:
             z_b = _forward_once(traj_b, ad_b_T)
-            d1 = _mean_euclidean_dist(z_b[:100], z_control[:100])
-            d2 = _mean_euclidean_dist(z_b[100:150], z_control[100:150])
-            d3 = _mean_euclidean_dist(z_b[150:], z_control[150:])
+            d1 = _centroid_dist(z_b[:100], z_control[:100])
+            d2 = _centroid_dist(z_b[100:150], z_control[100:150])
+            d3 = _centroid_dist(z_b[150:], z_control[150:])
             delta_b = 0.5 * (d1 - dist_base_1) + (d2 - dist_base_2) + 0.5 * (d3 - dist_base_3)
         except Exception:
             delta_b = 0.0
@@ -789,10 +798,10 @@ def Pathway_Drug_Perturbation(
 
             z_pert = _forward_once(traj_pert, ad_pert_T)
 
-            d1 = _mean_euclidean_dist(z_pert[:100], z_control[:100])
-            d2 = _mean_euclidean_dist(z_pert[100:150], z_control[100:150])
-            d3 = _mean_euclidean_dist(z_pert[150:], z_control[150:])
-            delta = d2 - dist_base_2
+            d1 = _centroid_dist(z_pert[:100], z_control[:100])
+            d2 = _centroid_dist(z_pert[100:150], z_control[100:150])
+            d3 = _centroid_dist(z_pert[150:], z_control[150:])
+            delta = 0.5 * (d1 - dist_base_1) + (d2 - dist_base_2) + 0.5 * (d3 - dist_base_3)
         except Exception:
             return None
 
@@ -828,19 +837,52 @@ def Pathway_Drug_Perturbation(
 
     res_df.to_csv(out_csv, index=False)
     _log(f"[SAVE] {out_csv}")
+
+    # Optional top-FDR heatmap (latest perturb_print behavior).
+    if plot_top and len(res_df) > 0:
+        top_n = min(int(plot_top), len(res_df))
+        top_df = res_df.head(top_n)
+        mat = top_df[["neglog10_q"]].to_numpy()
+        fig, ax = plt.subplots(figsize=(5, max(4, 0.45 * len(top_df))))
+        im = ax.imshow(mat, aspect="auto")
+        ax.set_yticks(np.arange(len(top_df)))
+        ax.set_yticklabels(top_df["pathway"].tolist(), fontsize=8)
+        ax.set_xticks([0])
+        ax.set_xticklabels(["-log10(FDR)"], fontsize=9)
+        ax.set_title("Top pathways by FDR (dir-aware multiplicative perturb)", fontsize=12)
+        cbar = plt.colorbar(im, ax=ax)
+        cbar.ax.set_ylabel("-log10(FDR)", rotation=90, va="center")
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+        plt.tight_layout()
+        prefix = os.path.splitext(out_csv)[0]
+        fig_png = f"{prefix}_top{top_n}_neglog10FDR.png"
+        fig.savefig(fig_png, dpi=200)
+        plt.close(fig)
+        _log(f"[SAVE] {fig_png}")
+
     return res_df
 
 
 # -*- coding: utf-8 -*-
-from __future__ import annotations
 
 import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from lifelines import KaplanMeierFitter
+from lifelines import KaplanMeierFitter, CoxPHFitter
 from lifelines.statistics import logrank_test
 from typing import Sequence, Tuple, Optional, Union, Dict, Any
+
+
+def _load_survival_gene_list(gene_list: Union[str, Sequence[str]]) -> list:
+    """Load a gene list from a sequence or a one-gene-per-line text file."""
+    if isinstance(gene_list, str) and os.path.exists(gene_list):
+        with open(gene_list, "r", encoding="utf-8") as f:
+            return [ln.strip() for ln in f if ln.strip()]
+    if isinstance(gene_list, (list, tuple, set)):
+        return list(gene_list)
+    raise ValueError("gene_list must be a gene-name list/tuple/set or a text-file path.")
 
 
 def Survival(
@@ -849,142 +891,83 @@ def Survival(
     duration_col: str = "duration",
     event_col: str = "event",
     event_mapping: Optional[Dict[Any, int]] = None,
+    penalizer: float = 0.1,
     data_name: str = "DATA",
-    high_risk_label: str = "High risk",
-    low_risk_label: str = "Low risk",
+    high_risk_label: str = "High-Risk",
+    background_label: str = "Background",
     colors: Tuple[str, str] = ("tab:red", "tab:gray"),
     fontsize: int = 12,
-    quantiles: Tuple[float, float] = (0.25, 0.75),
     save_pdf_path: Optional[str] = None,
     export_classified_csv_path: Optional[str] = None,
-    export_significant_csv_path: Optional[str] = None,
+    export_cox_summary_csv_path: Optional[str] = None,
     show: bool = True,
 ) -> Tuple[plt.Figure, plt.Axes, Dict[str, Any]]:
     """
-    Kaplan-Meier survival analysis using a multi-gene signature score from bulk RNA expression.
+    Kaplan-Meier survival analysis using the latest Survive.py CoxPH risk-score logic.
 
     Workflow
     --------
-    1) Load bulk CSV and intersect with provided gene list.
-    2) Z-score normalize each gene across samples.
-    3) Compute signature score per sample as the mean of normalized gene expression.
-    4) Stratify samples using quantile cutoffs:
-          score <= q_low  -> low_risk_label
-          score >= q_high -> high_risk_label
-          otherwise       -> "Middle" (excluded from KM/log-rank)
-    5) Run log-rank test and plot KM curves for High vs Low.
+    1) Load the bulk expression table and intersect it with ``gene_list``.
+    2) Fit a penalized multivariable Cox proportional-hazards model.
+    3) Compute each sample's risk score as expression @ fitted Cox coefficients.
+    4) Split samples at the median risk score into High-Risk and Background groups.
+    5) Run a log-rank test and draw Kaplan-Meier curves.
 
-    Parameters
-    ----------
-    bulk_csv : str
-        Bulk expression CSV with genes as columns and clinical columns (duration/event).
-    gene_list : str or sequence of str
-        Either a path to a text file listing genes (one per line) or a list/tuple/set of genes.
-    duration_col : str
-        Column name for survival time.
-    event_col : str
-        Column name for event indicator (0/1).
-    event_mapping : dict or None
-        Optional mapping to convert event labels (e.g. {"dead":1,"alive":0}).
-    data_name : str
-        Display name for legend title.
-    high_risk_label : str
-        Label for high group in plot.
-    low_risk_label : str
-        Label for low group in plot.
-    colors : (str, str)
-        Line colors for (high, low).
-    fontsize : int
-        Font size.
-    quantiles : (float, float)
-        (q_low, q_high), default (0.25, 0.75).
-    save_pdf_path : str or None
-        If provided, save figure as PDF.
-    export_classified_csv_path : str or None
-        If provided, export per-sample classification table (includes Middle).
-    export_significant_csv_path : str or None
-        If provided, export only samples in High/Low groups (excludes Middle).
-    show : bool
-        Whether to show the plot.
-
-    Returns
-    -------
-    fig, ax, results : (Figure, Axes, dict)
-        results contains p_value, cutoffs, group_counts, risk_scores, classified_df.
+    Optional exports include the classified sample table and the Cox model summary.
     """
-
-    def _load_gene_list(x: Union[str, Sequence[str]]) -> list:
-        if isinstance(x, str) and os.path.exists(x):
-            with open(x, "r", encoding="utf-8") as f:
-                return [ln.strip() for ln in f if ln.strip()]
-        if isinstance(x, (list, tuple, set)):
-            return list(x)
-        raise ValueError("gene_list must be a list/tuple/set of gene names or a text file path.")
-
-    # --- Load data ---
     df = pd.read_csv(bulk_csv)
-    genes = _load_gene_list(gene_list)
+    genes = _load_survival_gene_list(gene_list)
 
-    missing_cols = [c for c in (duration_col, event_col) if c not in df.columns]
-    if missing_cols:
-        raise KeyError(f"Missing required columns in CSV: {missing_cols}")
+    missing = [c for c in (duration_col, event_col) if c not in df.columns]
+    if missing:
+        raise KeyError(f"CSV is missing required columns: {missing}")
 
     genes_in = [g for g in genes if g in df.columns]
     if not genes_in:
-        raise ValueError("No overlap between gene_list and CSV columns.")
+        raise ValueError("gene_list has no overlap with the bulk CSV columns.")
 
     use_df = df.loc[:, genes_in + [duration_col, event_col]].copy()
 
-    # --- Event mapping ---
     if event_mapping is not None:
-        mapping_norm = {str(k).strip().lower(): int(v) for k, v in event_mapping.items()}
-        use_df[event_col] = use_df[event_col].apply(lambda x: mapping_norm.get(str(x).strip().lower(), x))
+        mapping = {str(k).strip().lower(): v for k, v in event_mapping.items()}
+        use_df[event_col] = use_df[event_col].apply(
+            lambda x: mapping.get(str(x).strip().lower(), x)
+        )
 
-    # --- Coerce to numeric ---
     for col in genes_in + [duration_col, event_col]:
         use_df[col] = pd.to_numeric(use_df[col], errors="coerce")
     use_df = use_df.dropna(subset=genes_in + [duration_col, event_col]).reset_index(drop=True)
 
-    # --- Validate event values ---
-    unique_events = set(use_df[event_col].unique().tolist())
+    unique_events = set(use_df[event_col].unique())
     if not unique_events.issubset({0, 1}):
-        raise ValueError(f"{event_col} must be 0/1. Found: {sorted(unique_events)}")
+        raise ValueError(f"{event_col} must contain only 0/1. Found: {sorted(unique_events)}")
 
-    # --- Z-score normalize genes across samples ---
-    gene_mat = use_df.loc[:, genes_in]
-    gene_mean = gene_mat.mean(axis=0)
-    gene_std = gene_mat.std(axis=0, ddof=0).replace(0, 1.0)
-    use_df.loc[:, genes_in] = (gene_mat - gene_mean) / gene_std
+    # Latest Survive.py: fit CoxPH on the selected genes, then use its linear predictor.
+    cph = CoxPHFitter(penalizer=penalizer)
+    cph.fit(
+        use_df[genes_in + [duration_col, event_col]],
+        duration_col=duration_col,
+        event_col=event_col,
+    )
 
-    # --- Risk score: mean of z-scored genes ---
-    risk_scores = use_df.loc[:, genes_in].mean(axis=1).to_numpy()
+    coef = cph.params_.reindex(genes_in).values.reshape(-1, 1)
+    expr = use_df.loc[:, genes_in].values
+    risk_scores = (expr @ coef).ravel()
 
-    q_low, q_high = float(quantiles[0]), float(quantiles[1])
-    if not (0.0 < q_low < q_high < 1.0):
-        raise ValueError("quantiles must satisfy 0 < q_low < q_high < 1.")
-
-    cutoff_low = float(np.quantile(risk_scores, q_low))
-    cutoff_high = float(np.quantile(risk_scores, q_high))
-
-    risk_group = np.array(["Middle"] * len(risk_scores), dtype=object)
-    risk_group[risk_scores <= cutoff_low] = low_risk_label
-    risk_group[risk_scores >= cutoff_high] = high_risk_label
+    median_risk = float(np.median(risk_scores))
+    risk_group = np.where(
+        risk_scores >= median_risk,
+        high_risk_label,
+        background_label,
+    )
 
     classified = use_df.copy()
     classified["risk"] = risk_group
-    classified["score"] = risk_scores
+    classified["scores"] = risk_scores
 
-    low = classified[classified["risk"] == low_risk_label]
+    low = classified[classified["risk"] == background_label]
     high = classified[classified["risk"] == high_risk_label]
 
-    if len(low) == 0 or len(high) == 0:
-        raise ValueError(
-            f"One group is empty after quantile split: "
-            f"{low_risk_label}={len(low)}, {high_risk_label}={len(high)}. "
-            f"Try different quantiles, e.g. (0.30, 0.70)."
-        )
-
-    # --- Log-rank test ---
     lr = logrank_test(
         durations_A=low[duration_col],
         durations_B=high[duration_col],
@@ -993,14 +976,13 @@ def Survival(
     )
     p_value = float(lr.p_value)
 
-    # --- KM plot ---
     fig, ax = plt.subplots(figsize=(8, 6))
     kmf = KaplanMeierFitter()
 
     kmf.fit(high[duration_col], event_observed=high[event_col], label=high_risk_label)
     kmf.plot_survival_function(ax=ax, ci_show=False, linewidth=2.5, color=colors[0])
 
-    kmf.fit(low[duration_col], event_observed=low[event_col], label=low_risk_label)
+    kmf.fit(low[duration_col], event_observed=low[event_col], label=background_label)
     kmf.plot_survival_function(ax=ax, ci_show=False, linewidth=2.5, color=colors[1])
 
     ax.set_xlabel("Time", fontsize=fontsize)
@@ -1008,9 +990,12 @@ def Survival(
     ax.tick_params(axis="both", labelsize=fontsize)
     ax.set_ylim(0, 1)
 
-    legend_labels = [data_name, high_risk_label, low_risk_label]
+    legend_labels = [data_name, high_risk_label, background_label]
     legend_handles = [plt.Line2D([0], [0], color="w", label=legend_labels[0])] + [
-        plt.Line2D([0], [0], marker="s", color="w", markerfacecolor=c, markersize=8, label=lab)
+        plt.Line2D(
+            [0], [0], marker="s", color="w", markerfacecolor=c,
+            markersize=8, label=lab,
+        )
         for c, lab in zip(colors, legend_labels[1:])
     ]
     fig.legend(
@@ -1032,12 +1017,10 @@ def Survival(
         fontstyle="italic",
         weight="bold",
     )
-
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     plt.tight_layout()
 
-    # --- Optional exports ---
     if save_pdf_path is not None:
         out_pdf = save_pdf_path if save_pdf_path.lower().endswith(".pdf") else f"{save_pdf_path}.pdf"
         fig.savefig(out_pdf, bbox_inches="tight")
@@ -1045,10 +1028,8 @@ def Survival(
     if export_classified_csv_path is not None:
         classified.to_csv(export_classified_csv_path, index=False)
 
-    if export_significant_csv_path is not None:
-        classified[classified["risk"].isin([low_risk_label, high_risk_label])].to_csv(
-            export_significant_csv_path, index=False
-        )
+    if export_cox_summary_csv_path is not None:
+        cph.summary.to_csv(export_cox_summary_csv_path)
 
     if show:
         plt.show()
@@ -1057,19 +1038,14 @@ def Survival(
 
     results = {
         "p_value": p_value,
-        "cutoffs": {f"q{int(q_low*100)}": cutoff_low, f"q{int(q_high*100)}": cutoff_high},
+        "median_risk": median_risk,
         "group_counts": {
             high_risk_label: int((risk_group == high_risk_label).sum()),
-            low_risk_label: int((risk_group == low_risk_label).sum()),
-            "Middle": int((risk_group == "Middle").sum()),
+            background_label: int((risk_group == background_label).sum()),
         },
         "risk_scores": risk_scores,
         "classified_df": classified,
+        "cox_summary_": cph.summary,
         "genes_used": genes_in,
     }
     return fig, ax, results
-
-
-
-
-
