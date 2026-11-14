@@ -61,3 +61,12 @@ Please check the tutorial directory of the repository.
 * [Tutorial for GeneRhythm gene clustering and differential frequency biomarker finding on single-cell ATAC-seq data](https://github.com/mcgilldinglab/GeneRhythm/blob/main/tutorial/scATAC-seq_mouse_atherosclerotic_plaque_immune_cells.ipynb)
 
 * [Tutorial for GeneRhythm PDAC disease perturbation on single-cell RNA-seq data](https://github.com/mcgilldinglab/GeneRhythm/blob/main/tutorial/scRNA-seq_PDAC_perturbation.ipynb)
+
+## Licensing
+
+GeneRhythm is offered under two licensing options:
+
+- **Noncommercial:** [PolyForm Noncommercial License 1.0.0](LICENSE-NONCOMMERCIAL.txt), under its complete, unmodified terms.
+- **Commercial:** uses outside those permissions require a separate written agreement with the copyright holders or their authorized representatives. Contact [jun.ding@mcgill.ca](mailto:jun.ding@mcgill.ca).
+
+See [LICENSE](LICENSE) and [commercial licensing](COMMERCIAL-LICENSING.md) for scope and details. Earlier licenses and third-party notices remain applicable to the material they cover. This is a source-available licensing model with a noncommercial restriction; it is not an OSI open-source license.
